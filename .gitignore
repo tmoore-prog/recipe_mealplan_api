@@ -1,17 +1,35 @@
-# python cache files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# pytest cache
+# Pytest cache
 .pytest_cache/
 
-# Virtual environments
-.venv/
+# Virtual environment (if you have one)
+venv/
+env/
+.env
 
-#Flask instance folder
+# Flask instance folder
 instance/
 
-# Database instances for development
+# Database files (if using SQLite for development)
 *.db
 *.sqlite
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Flask environment variables
+.flaskenv
+
+.coverage
+
+logs.json
