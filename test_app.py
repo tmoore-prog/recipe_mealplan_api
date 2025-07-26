@@ -1,6 +1,6 @@
 import pytest
 import json
-from config import create_app, db
+from ..config import create_app, db
 
 
 @pytest.fixture

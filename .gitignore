@@ -1,0 +1,17 @@
+# python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pytest cache
+.pytest_cache/
+
+# Virtual environments
+.venv/
+
+#Flask instance folder
+instance/
+
+# Database instances for development
+*.db
+*.sqlite
