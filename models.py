@@ -11,7 +11,7 @@ class Recipe(db.Model):
     prep_time = db.Column(db.Integer, index=True, nullable=False)
     cook_time = db.Column(db.Integer, index=True, nullable=False)
     servings = db.Column(db.Integer, index=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now())
+    created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
 
 
 class RecipeSchema(ma.SQLAlchemyAutoSchema):
@@ -19,6 +19,7 @@ class RecipeSchema(ma.SQLAlchemyAutoSchema):
     prep_time = Integer(required=True, validate=validate.Range(min=0))
     cook_time = Integer(required=True, validate=validate.Range(min=0))
     servings = Integer(required=True, validate=validate.Range(min=1))
+    created_at = DateTime(validate=validate.Equal(datetime.now()))
 
     class Meta:
         model = Recipe
