@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
-from models import Recipe, Ingredient, recipe_schema, recipes_schema
+from models import Recipe, recipe_schema, recipes_schema
+from models import Ingredient, ingredient_schema, ingredients_schema
 from config import db
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -89,4 +90,12 @@ def get_ingredients():
     query = select(Ingredient)
     results = db.session.execute(query)
     ingredients = results.scalars().all()
-    return jsonify(ingredients), 200
+    return jsonify(ingredients_schema.dump(ingredients)), 200
+
+
+@api_bp.route('/api/ingredients', methods=['POST'])
+def create_ingredient():
+    ingredient = ingredient_schema.load(request.get_json())
+    db.session.add(ingredient)
+    db.session.commit()
+    return jsonify(ingredient_schema.dump(ingredient)), 201

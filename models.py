@@ -19,7 +19,7 @@ class Ingredient(db.Model):
     name = db.Column(db.String(25), index=True, unique=True, nullable=False)
     category = db.Column(db.String(20), index=True, nullable=False)
     unit = db.Column(db.String(10), default="Each", nullable=False)
-    
+
 
 class RecipeSchema(ma.SQLAlchemyAutoSchema):
     name = String(required=True, validate=validate.Length(min=3, max=50))
@@ -34,5 +34,15 @@ class RecipeSchema(ma.SQLAlchemyAutoSchema):
         sqla_session = db.session
 
 
+class IngredientSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Ingredient
+        load_instance = True
+        sqla_session = db.session
+
+
 recipe_schema = RecipeSchema()
 recipes_schema = RecipeSchema(many=True)
+
+ingredient_schema = IngredientSchema()
+ingredients_schema = IngredientSchema(many=True)

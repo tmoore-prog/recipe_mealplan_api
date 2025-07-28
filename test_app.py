@@ -207,3 +207,40 @@ def test_get_empty_ingredients_list(client):
     response = client.get('/api/ingredients')
     assert response.status_code == 200
     assert response.get_json() == []
+
+
+def test_get_ingredient_returns_created_ingredient(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "Test cat.",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    assert create_response.status_code == 201
+    response = client.get('/api/ingredients')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data[0]['id'] == 1
+
+
+def test_get_multiple_ingredients(client):
+    data = [
+        {
+            "name": "Test ingredient 1",
+            "category": "Test",
+            "unit": "Test"
+        },
+        {
+            "name": "Test ingredient 2",
+            "category": "Test",
+            "unit": "Test"
+        }
+    ]
+    for datum in data:
+        client.post('/api/ingredients', data=json.dumps(datum),
+                    content_type='application/json')
+    response = client.get('/api/ingredients')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data) == 2
