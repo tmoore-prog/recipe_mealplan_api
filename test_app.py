@@ -3,6 +3,7 @@ import json
 from config import create_app, db
 from datetime import datetime, timedelta
 
+
 @pytest.fixture
 def client():
     test_app = create_app(config_type='testing')
@@ -244,3 +245,117 @@ def test_get_multiple_ingredients(client):
     assert response.status_code == 200
     data = response.get_json()
     assert len(data) == 2
+
+
+def test_create_ingredient_empty_name(client):
+    data = {
+        "name": "",
+        "category": "Test cat.",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    assert create_response.status_code == 400
+
+
+def test_create_ingredient_empty_category(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    assert create_response.status_code == 400
+
+
+def test_create_ingredient_missing_unit_returns_each(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "Test cat.",
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    assert create_response.status_code == 201
+    data = create_response.get_json()
+    assert data['unit'] == 'Each'
+
+
+def test_update_ingredient(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "Test cat.",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    update = {"unit": "ounce"}
+    update_response = client.patch(f'/api/ingredients/{ingredient_id}',
+                                   data=json.dumps(update),
+                                   content_type='application/json')
+    assert update_response.status_code == 200
+
+
+def test_update_nonexistent_ingredient(client):
+    update = {"unit": "ounce"}
+    response = client.patch('/api/ingredients/1', data=json.dumps(update),
+                            content_type='application/json')
+    assert response.status_code == 404
+
+
+def test_update_with_invalid_data(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "Test cat.",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    update = {"unit": ""}
+    update_response = client.patch(f'/api/ingredients/{ingredient_id}',
+                                   data=json.dumps(update),
+                                   content_type='application/json'
+                                   )
+    assert update_response.status_code == 400
+
+
+def test_get_ingredient_by_id(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "Test cat.",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    get_response = client.get(f'/api/ingredients/{ingredient_id}')
+    assert get_response.status_code == 200
+
+
+def test_get_non_existent_ingredient(client):
+    response = client.get('/api/ingredients/100')
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data['error'] == "Ingredient with id:100 not found"
+
+
+def test_delete_ingredient(client):
+    data = {
+        "name": "Test ingredient",
+        "category": "Test cat.",
+        "unit": "cup"
+    }
+    create_response = client.post('/api/ingredients', data=json.dumps(data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    response = client.delete(f'/api/ingredients/{ingredient_id}')
+    assert response.status_code == 200
+    get_response = client.get(f'/api/ingredients/{ingredient_id}')
+    assert get_response.status_code == 404
+
+
+def test_delete_non_existent_ingredient(client):
+    response = client.delete('/api/ingredients/100')
+    assert response.status_code == 404

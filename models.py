@@ -35,6 +35,10 @@ class RecipeSchema(ma.SQLAlchemyAutoSchema):
 
 
 class IngredientSchema(ma.SQLAlchemyAutoSchema):
+    name = String(required=True, validate=validate.Length(min=2, max=25))
+    category = String(required=True, validate=validate.Length(min=2, max=20))
+    unit = String(validate=validate.Length(min=3, max=10), load_default='Each')
+
     class Meta:
         model = Ingredient
         load_instance = True

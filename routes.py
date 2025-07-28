@@ -95,7 +95,49 @@ def get_ingredients():
 
 @api_bp.route('/api/ingredients', methods=['POST'])
 def create_ingredient():
-    ingredient = ingredient_schema.load(request.get_json())
+    try:
+        ingredient = ingredient_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"error": "Invalid data",
+                        "details": err.messages,
+                        "status": 400}), 400
     db.session.add(ingredient)
     db.session.commit()
     return jsonify(ingredient_schema.dump(ingredient)), 201
+
+
+@api_bp.route('/api/ingredients/<int:ingredient_id>', methods=['PATCH'])
+def update_ingredient(ingredient_id):
+    ingredient_to_update = db.session.get(Ingredient, ingredient_id)
+    if not ingredient_to_update:
+        return jsonify({"error": "Ingredient not found",
+                        "status": 404}), 404
+    try:
+        ingredient_schema.load(request.get_json(),
+                               instance=ingredient_to_update, partial=True)
+    except ValidationError as err:
+        return jsonify({"error": "Invalid data",
+                        "details": err.messages,
+                        "status": 400}), 400
+    db.session.commit()
+    return jsonify(ingredient_schema.dump(ingredient_to_update)), 200
+
+
+@api_bp.route('/api/ingredients/<int:ingredient_id>', methods=['GET'])
+def get_ingredient_by_id(ingredient_id):
+    ingredient = db.session.get(Ingredient, ingredient_id)
+    if not ingredient:
+        return jsonify({"error": f"Ingredient with id:{ingredient_id} not found",
+                        "status": 404}), 404
+    return jsonify(ingredient_schema.dump(ingredient)), 200
+
+
+@api_bp.route('/api/ingredients/<int:ingredient_id>', methods=['DELETE'])
+def delete_ingredient(ingredient_id):
+    ingredient_to_delete = db.session.get(Ingredient, ingredient_id)
+    if not ingredient_to_delete:
+        return jsonify({"error": f"Ingredient id {ingredient_id} not found",
+                        "status": 404}), 404
+    db.session.delete(ingredient_to_delete)
+    db.session.commit()
+    return jsonify({"message": "Ingredient successfully deleted"}), 200
