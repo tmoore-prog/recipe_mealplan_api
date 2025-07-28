@@ -1,6 +1,6 @@
 from config import db, ma
 from datetime import datetime
-from marshmallow.fields import String, DateTime, Integer
+from marshmallow.fields import String, DateTime, Integer, Nested
 from marshmallow import validate
 
 
@@ -13,12 +13,33 @@ class Recipe(db.Model):
     servings = db.Column(db.Integer, index=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
 
+    recipe_ingredients = db.relationship('RecipeIngredient',
+                                         back_populates='recipe')
+
 
 class Ingredient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(25), index=True, unique=True, nullable=False)
     category = db.Column(db.String(20), index=True, nullable=False)
-    unit = db.Column(db.String(10), default="Each", nullable=False)
+
+    recipe_ingredients = db.relationship('RecipeIngredient',
+                                         back_populates='ingredient')
+
+
+class RecipeIngredient(db.Model):
+    __tablename__ = 'recipe_ingredient'
+
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'),
+                          primary_key=True)
+    ingredient_id = db.Column(db.Integer, db.ForeignKey('ingredient.id'),
+                              primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit = db.Column(db.String(10), nullable=False)
+    notes = db.Column(db.String(20), nullable=True)
+
+    recipe = db.relationship('Recipe', back_populates='recipe_ingredients')
+    ingredient = db.relationship('Ingredient',
+                                 back_populates='recipe_ingredients')
 
 
 class RecipeSchema(ma.SQLAlchemyAutoSchema):
@@ -27,6 +48,8 @@ class RecipeSchema(ma.SQLAlchemyAutoSchema):
     cook_time = Integer(required=True, validate=validate.Range(min=0))
     servings = Integer(required=True, validate=validate.Range(min=1))
     created_at = DateTime(validate=validate.Equal(datetime.now()))
+
+    ingredients = Nested('RecipeIngredientSchema', many=True, dump_only=True)
 
     class Meta:
         model = Recipe
@@ -37,7 +60,6 @@ class RecipeSchema(ma.SQLAlchemyAutoSchema):
 class IngredientSchema(ma.SQLAlchemyAutoSchema):
     name = String(required=True, validate=validate.Length(min=2, max=25))
     category = String(required=True, validate=validate.Length(min=2, max=20))
-    unit = String(validate=validate.Length(min=3, max=10), load_default='Each')
 
     class Meta:
         model = Ingredient
@@ -45,8 +67,26 @@ class IngredientSchema(ma.SQLAlchemyAutoSchema):
         sqla_session = db.session
 
 
+class RecipeIngredientSchema(ma.SQLAlchemyAutoSchema):
+    quantity = Integer(validate=validate.Range(min=0, min_inclusive=False))
+    unit = String(validate=validate.Length(min=3, max=10), load_default='Each')
+    notes = String(validate=validate.Length(max=20), allow_none=True)
+
+    ingredient = Nested('IngredientSchema', only=['name', 'category'],
+                        dump_only=True)
+
+    class Meta:
+        model = RecipeIngredient
+        load_instance = True
+        sqla_session = db.session
+        include_fk = True
+
+
 recipe_schema = RecipeSchema()
 recipes_schema = RecipeSchema(many=True)
 
 ingredient_schema = IngredientSchema()
 ingredients_schema = IngredientSchema(many=True)
+
+recipe_ingredient_schema = RecipeIngredientSchema()
+recipe_ingredients_schema = RecipeIngredientSchema(many=True)

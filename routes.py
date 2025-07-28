@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 from models import Recipe, recipe_schema, recipes_schema
 from models import Ingredient, ingredient_schema, ingredients_schema
+from models import RecipeIngredient, recipe_ingredient_schema, \
+                   recipe_ingredients_schema
 from config import db
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -141,3 +143,9 @@ def delete_ingredient(ingredient_id):
     db.session.delete(ingredient_to_delete)
     db.session.commit()
     return jsonify({"message": "Ingredient successfully deleted"}), 200
+
+
+@api_bp.route('/api/recipes/<int:recipe_id>/ingredients', methods=['GET'])
+def get_ingredients_by_recipe(recipe_id):
+    recipe = db.session.get(Recipe, recipe_id)
+    return jsonify(recipe_ingredients_schema.dump(recipe.recipe_ingredients)), 200
