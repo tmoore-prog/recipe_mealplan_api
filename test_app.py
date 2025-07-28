@@ -19,6 +19,7 @@ def client():
             db.drop_all()
 
 
+# Restructure? Bulky and unneeded?
 @pytest.fixture
 def preload_client():
     test_app = create_app(config_type='testing')
@@ -395,10 +396,43 @@ def test_delete_non_existent_ingredient(client):
     assert response.status_code == 404
 
 
+# Restructure preload client?
 def test_get_ingredients_by_recipe(preload_client):
-    recipe_id = 2
+    recipe_id = 1
     response = preload_client.get(f'/api/recipes/{recipe_id}/ingredients')
     assert response.status_code == 200
     data = response.get_json()
-    assert data[0]['ingredient_id'] == 4
     assert data[0]['quantity'] == 2
+    assert data[1]['notes'] == "diced"
+    assert data[2]['ingredient']['name'] == "Ingredient 3"
+
+
+def test_add_ingredient_to_recipe(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = {
+        "name": "Test ingredient",
+        "category": "Test cat"
+    }
+    create_response = client.post('/api/ingredients', 
+                                  data=json.dumps(ingredient_data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    ri_data = {
+        "ingredient_id": ingredient_id,
+        "quantity": 2,
+        "unit": "cups",
+        "notes": "diced"
+    }
+    response = client.post(f'/api/recipes/{recipe_id}/ingredients',
+                           data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 201

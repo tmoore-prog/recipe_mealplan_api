@@ -148,4 +148,18 @@ def delete_ingredient(ingredient_id):
 @api_bp.route('/api/recipes/<int:recipe_id>/ingredients', methods=['GET'])
 def get_ingredients_by_recipe(recipe_id):
     recipe = db.session.get(Recipe, recipe_id)
+    if not recipe:
+        return jsonify({"error": f"Recipe id {recipe_id} not found",
+                        "status": 404}), 404
     return jsonify(recipe_ingredients_schema.dump(recipe.recipe_ingredients)), 200
+
+
+@api_bp.route('/api/recipes/<int:recipe_id>/ingredients', methods=['POST'])
+def add_ingredient_to_recipe(recipe_id):
+    recipe = db.session.get(Recipe, recipe_id)
+    data = request.get_json()
+    data['recipe_id'] = recipe.id
+    recipe_ingredient = recipe_ingredient_schema.load(data)
+    db.session.add(recipe_ingredient)
+    db.session.commit()
+    return jsonify(recipe_ingredient_schema.dump(recipe_ingredient)), 201
