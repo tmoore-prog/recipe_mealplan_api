@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
-from models import Recipe, recipe_schema, recipes_schema
+from models import Recipe, Ingredient, recipe_schema, recipes_schema
 from config import db
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -82,3 +82,11 @@ def delete_recipe(recipe_id):
     db.session.delete(recipe_to_delete)
     db.session.commit()
     return jsonify({"message": "Recipe successfully deleted"}), 200
+
+
+@api_bp.route('/api/ingredients', methods=['GET'])
+def get_ingredients():
+    query = select(Ingredient)
+    results = db.session.execute(query)
+    ingredients = results.scalars().all()
+    return jsonify(ingredients), 200

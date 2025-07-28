@@ -202,3 +202,8 @@ def test_delete_recipe_by_id(client):
     check = client.get(f'/api/recipes/{recipe_id}')
     assert check.status_code == 404
 
+
+def test_get_empty_ingredients_list(client):
+    response = client.get('/api/ingredients')
+    assert response.status_code == 200
+    assert response.get_json() == []

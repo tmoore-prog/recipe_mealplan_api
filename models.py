@@ -14,6 +14,13 @@ class Recipe(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now(), nullable=False)
 
 
+class Ingredient(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(25), index=True, unique=True, nullable=False)
+    category = db.Column(db.String(20), index=True, nullable=False)
+    unit = db.Column(db.String(10), default="Each", nullable=False)
+    
+
 class RecipeSchema(ma.SQLAlchemyAutoSchema):
     name = String(required=True, validate=validate.Length(min=3, max=50))
     prep_time = Integer(required=True, validate=validate.Range(min=0))
