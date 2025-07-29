@@ -292,3 +292,47 @@ def update_recipe_ingredient(recipe_id, ingredient_id):
         return jsonify({"error": "Database error",
                         "details": str(err),
                         "status": 500}), 500
+
+
+@api_bp.route('/api/recipes/<int:recipe_id>/ingredients/bulk',
+              methods=['POST'])
+def add_multiple_ingredients_to_recipe(recipe_id):
+    recipe = db.session.get(Recipe, recipe_id)
+    if not recipe:
+        return jsonify({"error": f"Recipe id {recipe_id} not found",
+                        "status": 404}), 404
+    data = request.get_json()
+    recipe_ingredients = []
+    if not data or not isinstance(data, list):
+        return jsonify({"error": "Expected 'ingredients' array in request body",
+                        "status": 400}), 400
+    for datum in data:
+        ingredient = db.session.get(Ingredient, datum['ingredient_id'])
+        if not ingredient:
+            return jsonify({"error": f"Ingredient id {datum['ingredient_id']} "
+                            "not found",
+                            "status": 404}), 404
+        datum['recipe_id'] = recipe_id
+        try:
+            ri = recipe_ingredient_schema.load(datum)
+        except ValidationError as err:
+            return jsonify({"error": "Invalid data",
+                            "details": err.messages,
+                            "status": 400}), 400
+        db.session.add(ri)
+        recipe_ingredients.append(ri)
+    try:
+        db.session.commit()
+        return jsonify(recipe_ingredients_schema.dump(recipe_ingredients)), 201
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
+
+
+@api_bp.route('/api/recipe-ingredients', methods=['GET'])
+def get_all_recipe_ingredients():
+    query = select(RecipeIngredient)
+    result = db.session.execute(query).scalars().all()
+    return jsonify(recipe_ingredients_schema.dump(result)), 200

@@ -776,3 +776,218 @@ def test_update_ri_with_bad_data(client):
                                 f'/{ingredient_id}', data=json.dumps(data),
                                 content_type='application/json')
         assert response.status_code == 400
+
+
+def test_add_multiple_ingredients_to_recipe(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = [
+        {"name": "Test ingredient",
+         "category": "Test cat"},
+        {"name": "Test ingredient 2",
+         "category": "Test cat"},
+        {"name": "Test ingredient 3",
+         "category": "Test cat"}
+    ]
+    ingredient_ids = []
+    for ingredient in ingredient_data:
+        create_response = client.post('/api/ingredients',
+                                      data=json.dumps(ingredient),
+                                      content_type='application/json')
+        ingredient_id = create_response.get_json()['id']
+        ingredient_ids.append(ingredient_id)
+    ri_data = []
+    for ingredient_id in ingredient_ids:
+        ri_dict = {"ingredient_id": ingredient_id,
+                   "quantity": 1,
+                   "unit": "each",
+                   "notes": "Test"}
+        ri_data.append(ri_dict)
+    response = client.post(f'/api/recipes/{recipe_id}/ingredients/bulk',
+                           data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 201
+    data = response.get_json()
+    assert len(data) == 3
+
+
+def test_add_multiple_ingredients_to_nonexistent_recipe(client):
+    ingredient_data = [
+        {"name": "Test ingredient",
+         "category": "Test cat"},
+        {"name": "Test ingredient 2",
+         "category": "Test cat"},
+        {"name": "Test ingredient 3",
+         "category": "Test cat"}
+    ]
+    ingredient_ids = []
+    for ingredient in ingredient_data:
+        create_response = client.post('/api/ingredients',
+                                      data=json.dumps(ingredient),
+                                      content_type='application/json')
+        ingredient_id = create_response.get_json()['id']
+        ingredient_ids.append(ingredient_id)
+    ri_data = []
+    for ingredient_id in ingredient_ids:
+        ri_dict = {"ingredient_id": ingredient_id,
+                   "quantity": 1,
+                   "unit": "each",
+                   "notes": "Test"}
+        ri_data.append(ri_dict)
+    response = client.post('/api/recipes/123/ingredients/bulk',
+                           data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 404
+
+
+def test_add_multiple_non_existent_ingredients_to_recipe(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_ids = [1, 2, 3]
+    ri_data = []
+    for ingredient_id in ingredient_ids:
+        ri_dict = {"ingredient_id": ingredient_id,
+                   "quantity": 1,
+                   "unit": "each",
+                   "notes": "Test"}
+        ri_data.append(ri_dict)
+    response = client.post(f'/api/recipes/{recipe_id}/ingredients/bulk',
+                           data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 404
+
+
+def test_add_multiple_bad_formatted_ingredients_to_recipe(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = [
+        {"name": "Test ingredient",
+         "category": "Test cat"},
+        {"name": "Test ingredient 2",
+         "category": "Test cat"},
+        {"name": "Test ingredient 3",
+         "category": "Test cat"}
+    ]
+    ingredient_ids = []
+    for ingredient in ingredient_data:
+        create_response = client.post('/api/ingredients',
+                                      data=json.dumps(ingredient),
+                                      content_type='application/json')
+        ingredient_id = create_response.get_json()['id']
+        ingredient_ids.append(ingredient_id)
+    ri_data = []
+    for ingredient_id in ingredient_ids:
+        ri_dict = {"ingredient_id": ingredient_id,
+                   "quantity": "Three",
+                   "unit": "each",
+                   "notes": "Test"}
+        ri_data.append(ri_dict)
+    response = client.post(f'/api/recipes/{recipe_id}/ingredients/bulk',
+                           data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 400
+
+
+def test_add_multiple_ingredients_not_list_formatted(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = [
+        {"name": "Test ingredient",
+         "category": "Test cat"},
+        {"name": "Test ingredient 2",
+         "category": "Test cat"},
+        {"name": "Test ingredient 3",
+         "category": "Test cat"}
+    ]
+    ingredient_ids = []
+    for ingredient in ingredient_data:
+        create_response = client.post('/api/ingredients',
+                                      data=json.dumps(ingredient),
+                                      content_type='application/json')
+        ingredient_id = create_response.get_json()['id']
+        ingredient_ids.append(ingredient_id)
+    ri_data = {}
+    for ingredient_id in ingredient_ids:
+        ri_dict = {"ingredient_id": ingredient_id,
+                   "quantity": 1,
+                   "unit": "each",
+                   "notes": "Test"}
+        ri_data[ingredient_id] = ri_dict
+    response = client.post(f'/api/recipes/{recipe_id}/ingredients/bulk',
+                           data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 400
+
+
+def test_get_master_list_recipe_ingredients(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = [
+        {"name": "Test ingredient",
+         "category": "Test cat"},
+        {"name": "Test ingredient 2",
+         "category": "Test cat"},
+        {"name": "Test ingredient 3",
+         "category": "Test cat"}
+    ]
+    ingredient_ids = []
+    for ingredient in ingredient_data:
+        create_response = client.post('/api/ingredients',
+                                      data=json.dumps(ingredient),
+                                      content_type='application/json')
+        ingredient_id = create_response.get_json()['id']
+        ingredient_ids.append(ingredient_id)
+    ri_data = []
+    for ingredient_id in ingredient_ids:
+        ri_dict = {"ingredient_id": ingredient_id,
+                   "quantity": 1,
+                   "unit": "each",
+                   "notes": "Test"}
+        ri_data.append(ri_dict)
+    client.post(f'/api/recipes/{recipe_id}/ingredients/bulk',
+                data=json.dumps(ri_data),
+                content_type='application/json')
+    response = client.get('/api/recipe-ingredients')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data) == 3
