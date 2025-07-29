@@ -49,7 +49,8 @@ class RecipeSchema(ma.SQLAlchemyAutoSchema):
     servings = Integer(required=True, validate=validate.Range(min=1))
     created_at = DateTime(validate=validate.Equal(datetime.now()))
 
-    ingredients = Nested('RecipeIngredientSchema', many=True, dump_only=True)
+    recipe_ingredients = Nested('RecipeIngredientSchema', many=True,
+                                dump_only=True)
 
     class Meta:
         model = Recipe
@@ -68,8 +69,10 @@ class IngredientSchema(ma.SQLAlchemyAutoSchema):
 
 
 class RecipeIngredientSchema(ma.SQLAlchemyAutoSchema):
-    quantity = Integer(validate=validate.Range(min=0, min_inclusive=False))
-    unit = String(validate=validate.Length(min=3, max=10), load_default='Each')
+    quantity = Integer(required=True,
+                       validate=validate.Range(min=0, min_inclusive=False))
+    unit = String(validate=validate.Length(min=3, max=10),
+                  load_default='each')
     notes = String(validate=validate.Length(max=20), allow_none=True)
 
     ingredient = Nested('IngredientSchema', only=['name', 'category'],

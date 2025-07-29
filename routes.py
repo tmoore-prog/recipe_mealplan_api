@@ -157,9 +157,34 @@ def get_ingredients_by_recipe(recipe_id):
 @api_bp.route('/api/recipes/<int:recipe_id>/ingredients', methods=['POST'])
 def add_ingredient_to_recipe(recipe_id):
     recipe = db.session.get(Recipe, recipe_id)
+    if not recipe:
+        return jsonify({"error": f"Recipe id {recipe_id} not found",
+                        "status": 404}), 404
     data = request.get_json()
-    data['recipe_id'] = recipe.id
-    recipe_ingredient = recipe_ingredient_schema.load(data)
-    db.session.add(recipe_ingredient)
-    db.session.commit()
-    return jsonify(recipe_ingredient_schema.dump(recipe_ingredient)), 201
+    data['recipe_id'] = recipe_id
+    ingredient = db.session.get(Ingredient, data['ingredient_id'])
+    if not ingredient:
+        return jsonify({"error": "Ingredient id "
+                        f"{data['ingredient_id']} not found",
+                        "status": 404}), 404
+    existing = db.session.query(RecipeIngredient).filter_by(
+               recipe_id=recipe_id,
+               ingredient_id=data['ingredient_id']).first()
+    if existing:
+        return jsonify({"error": f"Recipe id {recipe_id} already contains "
+                        "this ingredient",
+                        "status": 409}), 409
+    try:
+        recipe_ingredient = recipe_ingredient_schema.load(data)
+    except ValidationError as err:
+        return jsonify({"error": "Invalid data", "details": err.messages,
+                        "status": 400}), 400
+    try:
+        db.session.add(recipe_ingredient)
+        db.session.commit()
+        return jsonify(recipe_ingredient_schema.dump(recipe_ingredient)), 201
+    except IntegrityError as err:
+        db.session.rollback()
+        return jsonify({"error": "Table contraint not met",
+                        "details": str(err),
+                        "status": 400}), 400
