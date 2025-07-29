@@ -262,3 +262,33 @@ def remove_recipe_ingredient(recipe_id, ingredient_id):
         return jsonify({"error": "Database error",
                         "details": str(err),
                         "status": 500}), 500
+
+
+@api_bp.route('/api/recipes/<int:recipe_id>/ingredients/<int:ingredient_id>',
+              methods=['PATCH'])
+def update_recipe_ingredient(recipe_id, ingredient_id):
+    recipe_ingredient = db.session.get(RecipeIngredient,
+                                       (recipe_id, ingredient_id))
+    if not recipe_ingredient:
+        return jsonify({"error": f"Ingredient id {ingredient_id} "
+                        f"not found for recipe id {recipe_id}",
+                        "status": 404}), 404
+    data = request.get_json()
+    allowed_fields = ['unit', 'notes', 'quantity']
+    filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
+    try:
+        recipe_ingredient_schema.load(filtered_data,
+                                      instance=recipe_ingredient,
+                                      partial=True)
+    except ValidationError as err:
+        return jsonify({"error": "Invalid data",
+                        "details": err.messages,
+                        "status": 400}), 400
+    try:
+        db.session.commit()
+        return jsonify(recipe_ingredient_schema.dump(recipe_ingredient)), 200
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
