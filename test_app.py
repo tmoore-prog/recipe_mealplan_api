@@ -553,3 +553,93 @@ def test_add_same_ingredient_to_recipe_twice(client):
                            data=json.dumps(ri_data),
                            content_type='application/json')
     assert response.status_code == 409
+
+
+def test_get_specific_recipe_ingredient(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = {
+        "name": "Test ingredient",
+        "category": "Test cat"
+    }
+    create_response = client.post('/api/ingredients',
+                                  data=json.dumps(ingredient_data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    ri_data = {
+        "ingredient_id": ingredient_id,
+        "quantity": 2,
+        "unit": "cups",
+        "notes": "diced"
+    }
+    client.post(f'/api/recipes/{recipe_id}/ingredients',
+                data=json.dumps(ri_data),
+                content_type='application/json')
+    response = client.get(f'/api/recipes/{recipe_id}/ingredients/{ingredient_id}')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['ingredient']['name'] == "Test ingredient"
+
+
+def test_get_non_existent_recipe_ingredient(client):
+    recipe_id = 38
+    ingredient_id = 31
+    response = client.get(f'/api/recipes/{recipe_id}/ingredients/{ingredient_id}')
+    assert response.status_code == 404
+    data = response.get_json()
+    assert data['error'] == "Ingredient id 31 not found for recipe id 38"
+
+
+def test_remove_ingredient_from_recipe(client):
+    # Set up test data
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ingredient_data = {
+        "name": "Test ingredient",
+        "category": "Test cat"
+    }
+    create_response = client.post('/api/ingredients',
+                                  data=json.dumps(ingredient_data),
+                                  content_type='application/json')
+    ingredient_id = create_response.get_json()['id']
+    ri_data = {
+        "ingredient_id": ingredient_id,
+        "quantity": 2,
+        "unit": "cups",
+        "notes": "diced"
+    }
+    client.post(f'/api/recipes/{recipe_id}/ingredients',
+                data=json.dumps(ri_data),
+                content_type='application/json')
+
+    # Delete test recipe ingredient
+    delete_response = client.delete(f'/api/recipes/{recipe_id}/ingredients'
+                                    f'/{ingredient_id}')
+    assert delete_response.status_code == 200
+    get_response = client.get(f'/api/recipes/{recipe_id}/ingredients/'
+                              f'{ingredient_id}')
+    assert get_response.status_code == 404
+
+
+def test_remove_non_existent_recipe_ingredient(client):
+    recipe_id = 1
+    ingredient_id = 1
+    delete_response = client.delete(f'/api/recipes/{recipe_id}/ingredients'
+                                    f'/{ingredient_id}')
+    assert delete_response.status_code == 404

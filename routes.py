@@ -6,7 +6,7 @@ from models import RecipeIngredient, recipe_ingredient_schema, \
                    recipe_ingredients_schema
 from config import db
 from marshmallow import ValidationError
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 api_bp = Blueprint('api', __name__)
 
@@ -46,9 +46,15 @@ def add_recipe():
         db.session.commit()
         return jsonify(recipe_schema.dump(recipe)), 201
     except IntegrityError as err:
+        db.session.rollback()
         return jsonify({"error": "Unique constraint error",
                         "details": str(err),
                         "status": 400}), 400
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
 
 
 @api_bp.route('/api/recipes/<int:recipe_id>', methods=["PATCH"])
@@ -70,9 +76,15 @@ def update_recipe(recipe_id):
         db.session.commit()
         return jsonify(recipe_schema.dump(recipe_to_update)), 200
     except IntegrityError as err:
+        db.session.rollback()
         return jsonify({"error": "Unique constraint error",
                         "details": str(err),
                         "status": 400}), 400
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
 
 
 @api_bp.route('/api/recipes/<int:recipe_id>', methods=['DELETE'])
@@ -81,10 +93,15 @@ def delete_recipe(recipe_id):
     if not recipe_to_delete:
         return jsonify({"error": f"Recipe with id {recipe_id} not found",
                        "status": 404}), 404
-
-    db.session.delete(recipe_to_delete)
-    db.session.commit()
-    return jsonify({"message": "Recipe successfully deleted"}), 200
+    try:
+        db.session.delete(recipe_to_delete)
+        db.session.commit()
+        return jsonify({"message": "Recipe successfully deleted"}), 200
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
 
 
 @api_bp.route('/api/ingredients', methods=['GET'])
@@ -103,9 +120,15 @@ def create_ingredient():
         return jsonify({"error": "Invalid data",
                         "details": err.messages,
                         "status": 400}), 400
-    db.session.add(ingredient)
-    db.session.commit()
-    return jsonify(ingredient_schema.dump(ingredient)), 201
+    try:
+        db.session.add(ingredient)
+        db.session.commit()
+        return jsonify(ingredient_schema.dump(ingredient)), 201
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
 
 
 @api_bp.route('/api/ingredients/<int:ingredient_id>', methods=['PATCH'])
@@ -121,8 +144,14 @@ def update_ingredient(ingredient_id):
         return jsonify({"error": "Invalid data",
                         "details": err.messages,
                         "status": 400}), 400
-    db.session.commit()
-    return jsonify(ingredient_schema.dump(ingredient_to_update)), 200
+    try:
+        db.session.commit()
+        return jsonify(ingredient_schema.dump(ingredient_to_update)), 200
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
 
 
 @api_bp.route('/api/ingredients/<int:ingredient_id>', methods=['GET'])
@@ -140,9 +169,15 @@ def delete_ingredient(ingredient_id):
     if not ingredient_to_delete:
         return jsonify({"error": f"Ingredient id {ingredient_id} not found",
                         "status": 404}), 404
-    db.session.delete(ingredient_to_delete)
-    db.session.commit()
-    return jsonify({"message": "Ingredient successfully deleted"}), 200
+    try:
+        db.session.delete(ingredient_to_delete)
+        db.session.commit()
+        return jsonify({"message": "Ingredient successfully deleted"}), 200
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
 
 
 @api_bp.route('/api/recipes/<int:recipe_id>/ingredients', methods=['GET'])
@@ -188,3 +223,42 @@ def add_ingredient_to_recipe(recipe_id):
         return jsonify({"error": "Table contraint not met",
                         "details": str(err),
                         "status": 400}), 400
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
+
+
+@api_bp.route('/api/recipes/<int:recipe_id>/ingredients/<int:ingredient_id>',
+              methods=['GET'])
+def get_specific_recipe_ingredient(recipe_id, ingredient_id):
+    recipe_ingredient = db.session.get(RecipeIngredient,
+                                       (recipe_id, ingredient_id))
+    if not recipe_ingredient:
+        return jsonify({"error": f"Ingredient id {ingredient_id} not found "
+                        f"for recipe id {recipe_id}",
+                        "status": 404}), 404
+    return jsonify(recipe_ingredient_schema.dump(recipe_ingredient)), 200
+
+
+@api_bp.route('/api/recipes/<int:recipe_id>/ingredients/<int:ingredient_id>',
+              methods=['DELETE'])
+def remove_recipe_ingredient(recipe_id, ingredient_id):
+    recipe_ingredient = db.session.get(RecipeIngredient,
+                                       (recipe_id, ingredient_id))
+    if not recipe_ingredient:
+        return jsonify({"error": f"Ingredient id {ingredient_id} "
+                        f"not found for recipe id {recipe_id}",
+                        "status": 404}), 404
+    try:
+        db.session.delete(recipe_ingredient)
+        db.session.commit()
+        return jsonify({"message": f"Ingredient id {ingredient_id} "
+                        f"successfully deleted from recipe id {recipe_id}",
+                        "status": 200}), 200
+    except SQLAlchemyError as err:
+        db.session.rollback()
+        return jsonify({"error": "Database error",
+                        "details": str(err),
+                        "status": 500}), 500
