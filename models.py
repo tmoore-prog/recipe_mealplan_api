@@ -1,7 +1,8 @@
 from config import db, ma
 from datetime import datetime
 from marshmallow.fields import String, DateTime, Integer, Nested, Email
-from marshmallow import validate
+from marshmallow import validate, post_load
+from werkzeug.security import generate_password_hash
 
 
 class Recipe(db.Model):
@@ -31,9 +32,14 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(40), index=True, unique=True,
                          nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
+    joined_on = db.Column(db.DateTime, default=datetime.now)
 
     collected_recipes = db.relationship('UserRecipe', back_populates='user')
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
 
 
 class UserRecipe(db.Model):
@@ -109,6 +115,30 @@ class RecipeIngredientSchema(ma.SQLAlchemyAutoSchema):
         include_fk = True
 
 
+class UserSchema(ma.SQLAlchemyAutoSchema):
+    username = String(required=True, validate=validate.Length(min=3,
+                                                              max=40))
+    password = String(required=True, validate=validate.Length(min=8),
+                      load_only=True)
+    password_hash = String()
+    email = Email(required=True)
+    joined_on = DateTime(validate=validate.Equal(datetime.now),
+                         dump_only=True)
+
+    @post_load
+    def hash_password(self, data, **kwargs):
+        if "password" in data:
+            data['password_hash'] = generate_password_hash(data['password'])
+            del data['password']
+        return data
+
+    class Meta:
+        model = User
+        load_instance = True
+        sqla_session = db.session
+        exclude = ['password_hash']
+
+
 recipe_schema = RecipeSchema()
 recipes_schema = RecipeSchema(many=True)
 
@@ -117,3 +147,5 @@ ingredients_schema = IngredientSchema(many=True)
 
 recipe_ingredient_schema = RecipeIngredientSchema()
 recipe_ingredients_schema = RecipeIngredientSchema(many=True)
+
+user_schema = UserSchema()
