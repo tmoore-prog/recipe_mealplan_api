@@ -24,7 +24,10 @@ def create_app(config_type='development'):
     ma.init_app(app)
     migrate.init_app(app, db)
 
-    from routes import api_bp
-    app.register_blueprint((api_bp))
+    from api.recipes import recipes_bp
+    from api.ingredients import ingredients_bp
+
+    app.register_blueprint(recipes_bp)
+    app.register_blueprint(ingredients_bp)
 
     return app
