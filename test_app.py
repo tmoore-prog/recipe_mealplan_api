@@ -137,7 +137,7 @@ def test_add_same_name_recipe(client):
                 content_type='application/json')
     response = client.post('/api/recipes/', data=json.dumps(data[1]),
                            content_type='application/json')
-    assert response.status_code == 400
+    assert response.status_code == 409
 
 
 def test_add_name_empty(client):
@@ -947,5 +947,87 @@ def test_add_multiple_ingredients_not_list_formatted(client):
         ri_data[ingredient_id] = ri_dict
     response = client.post(f'/api/recipes/{recipe_id}/ingredients/bulk',
                            data=json.dumps(ri_data),
+                           content_type='application/json')
+    assert response.status_code == 400
+
+
+def test_register_new_user_doesnt_return_hash(client):
+    data = {
+        "username": "Testexample",
+        "password": "1234secret",
+        "email": "test@example.com"
+    }
+    response = client.post('/api/auth/register', data=json.dumps(data),
+                           content_type='application/json')
+    assert response.status_code == 201
+    data = response.get_json()
+    assert 'password_hash' not in data
+    assert 'password' not in data
+
+
+def test_register_new_user_missing_data(client):
+    data_cases = [
+        {"password": "1234secret", "email": "test@example.com"},
+        {"username": "testexample", "email": "test1@example.com"},
+        {"username": "testexample1", "password": "1234secret"}
+    ]
+    for data in data_cases:
+        response = client.post('/api/auth/register', data=json.dumps(data),
+                               content_type='application/json')
+        assert response.status_code == 400
+
+
+def test_register_new_user_unique_constraints(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    data_cases = [
+        {"username": "johndoe1", "password": "1234secret",
+         "email": "jdoe@example.org"},
+        {"username": "johndoe2", "password": "1234secret",
+         "email": "john@example.com"}
+    ]
+    for data in data_cases:
+        response = client.post('/api/auth/register', data=json.dumps(data),
+                               content_type='application/json')
+        assert response.status_code == 409
+
+
+def test_get_jwt_with_valid_user(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    login = {
+        "username": "johndoe1",
+        "password": "1234secret"
+    }
+    response = client.post('/api/auth/login', data=json.dumps(login),
+                           content_type='application/json')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['access_token']
+
+
+def test_get_jwt_with_invalid_pw(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    login = {
+        "username": "johndoe1",
+        "password": "FakePassword"
+    }
+    response = client.post('/api/auth/login', data=json.dumps(login),
                            content_type='application/json')
     assert response.status_code == 400

@@ -48,9 +48,10 @@ def add_recipe():
         return jsonify(recipe_schema.dump(recipe)), 201
     except IntegrityError as err:
         db.session.rollback()
-        return jsonify({"error": "Unique constraint error",
-                        "details": str(err),
-                        "status": 400}), 400
+        if 'UNIQUE constraint' in str(err):
+            return jsonify({"error": "That username or email already exists",
+                            "details": str(err),
+                            "status": 409}), 409
     except SQLAlchemyError as err:
         db.session.rollback()
         return jsonify({"error": "Database error",
