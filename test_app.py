@@ -1033,7 +1033,7 @@ def test_get_jwt_with_invalid_pw(client):
     assert response.status_code == 400
 
 
-def test_get_empty_recipe_list_for_user(client):
+def test_get_empty_user_recipes(client):
     user_data = {
         "username": "johndoe1",
         "password": "1234secret",
@@ -1052,3 +1052,168 @@ def test_get_empty_recipe_list_for_user(client):
     response = client.get('/api/users/recipes', headers=headers)
     assert response.status_code == 200
     assert response.get_json() == []
+
+
+def test_get_user_recipes_no_token(client):
+    response = client.get('/api/users/recipes')
+    assert response.status_code == 401
+
+
+def test_add_recipe_to_user(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    login = {
+        "username": "johndoe1",
+        "password": "1234secret"
+    }
+    login_response = client.post('/api/auth/login', data=json.dumps(login),
+                                 content_type='application/json')
+    access_token = login_response.get_json()['access_token']
+    headers = {"Authorization": f"Bearer {access_token}"}
+    ur_data = {
+        "recipe_id": recipe_id,
+        "user_notes": "Test"
+    }
+    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
+                           content_type='application/json',
+                           headers=headers)
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data['user_id'] == 1
+
+
+def test_add_non_existent_recipe_to_user(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    recipe_id = 101
+    login = {
+        "username": "johndoe1",
+        "password": "1234secret"
+    }
+    login_response = client.post('/api/auth/login', data=json.dumps(login),
+                                 content_type='application/json')
+    access_token = login_response.get_json()['access_token']
+    headers = {"Authorization": f"Bearer {access_token}"}
+    ur_data = {
+        "recipe_id": recipe_id,
+        "user_notes": "Test"
+    }
+    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
+                           content_type='application/json',
+                           headers=headers)
+    assert response.status_code == 404
+
+
+def test_add_user_recipe_no_token(client):
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    ur_data = {
+        "recipe_id": recipe_id,
+        "user_notes": "Test"
+    }
+    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
+                           content_type='application/json')
+    assert response.status_code == 401
+
+
+def test_add_user_recipe_bad_data(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    login = {
+        "username": "johndoe1",
+        "password": "1234secret"
+    }
+    login_response = client.post('/api/auth/login', data=json.dumps(login),
+                                 content_type='application/json')
+    access_token = login_response.get_json()['access_token']
+    headers = {"Authorization": f"Bearer {access_token}"}
+    ur_data = {
+        "recipe_id": recipe_id,
+        "user_notes": 123
+    }
+    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
+                           content_type='application/json',
+                           headers=headers)
+    assert response.status_code == 400
+
+
+def test_add_duplicate_user_recipe(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    recipe_data = {
+        "name": "Test recipe",
+        "instructions": "Test steps",
+        "prep_time": 10,
+        "cook_time": 10,
+        "servings": 3
+    }
+    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
+                                  content_type='application/json')
+    recipe_id = create_response.get_json()['id']
+    login = {
+        "username": "johndoe1",
+        "password": "1234secret"
+    }
+    login_response = client.post('/api/auth/login', data=json.dumps(login),
+                                 content_type='application/json')
+    access_token = login_response.get_json()['access_token']
+    headers = {"Authorization": f"Bearer {access_token}"}
+    ur_data = {
+        "recipe_id": recipe_id,
+        "user_notes": "Test"
+    }
+    client.post('/api/users/recipes', data=json.dumps(ur_data),
+                content_type='application/json', headers=headers)
+    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
+                           content_type='application/json',
+                           headers=headers)
+    assert response.status_code == 409
+ 

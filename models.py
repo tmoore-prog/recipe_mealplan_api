@@ -116,7 +116,7 @@ class RecipeIngredientSchema(ma.SQLAlchemyAutoSchema):
 
 
 class UserRecipeSchema(ma.SQLAlchemyAutoSchema):
-    recipe = Nested('RecipeSchema', dump_only=True)
+    recipe = Nested('RecipeSchema', only=['name', 'recipe_ingredients', 'servings'], dump_only=True)
 
     class Meta:
         model = UserRecipe
