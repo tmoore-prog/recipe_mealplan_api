@@ -1031,3 +1031,24 @@ def test_get_jwt_with_invalid_pw(client):
     response = client.post('/api/auth/login', data=json.dumps(login),
                            content_type='application/json')
     assert response.status_code == 400
+
+
+def test_get_empty_recipe_list_for_user(client):
+    user_data = {
+        "username": "johndoe1",
+        "password": "1234secret",
+        "email": "john@example.com"
+    }
+    client.post('/api/auth/register', data=json.dumps(user_data),
+                content_type='application/json')
+    login = {
+        "username": "johndoe1",
+        "password": "1234secret"
+    }
+    response = client.post('/api/auth/login', data=json.dumps(login),
+                           content_type='application/json')
+    access_token = response.get_json()['access_token']
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = client.get('/api/users/recipes', headers=headers)
+    assert response.status_code == 200
+    assert response.get_json() == []

@@ -115,6 +115,16 @@ class RecipeIngredientSchema(ma.SQLAlchemyAutoSchema):
         include_fk = True
 
 
+class UserRecipeSchema(ma.SQLAlchemyAutoSchema):
+    recipe = Nested('RecipeSchema', dump_only=True)
+
+    class Meta:
+        model = UserRecipe
+        load_instance = True
+        sqla_session = db.session
+        include_fk = True
+
+
 class UserSchema(ma.SQLAlchemyAutoSchema):
     username = String(required=True, validate=validate.Length(min=3,
                                                               max=40))
@@ -124,6 +134,8 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
     email = Email(required=True)
     joined_on = DateTime(validate=validate.Equal(datetime.now),
                          dump_only=True)
+
+    collected_recipes = Nested('UserRecipeSchema', many=True, dump_only=True)
 
     @post_load
     def hash_password(self, data, **kwargs):
@@ -149,3 +161,6 @@ recipe_ingredient_schema = RecipeIngredientSchema()
 recipe_ingredients_schema = RecipeIngredientSchema(many=True)
 
 user_schema = UserSchema()
+
+user_recipe_schema = UserRecipeSchema()
+user_recipes_schema = UserRecipeSchema(many=True)

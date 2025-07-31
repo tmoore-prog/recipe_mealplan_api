@@ -9,6 +9,7 @@ ma = Marshmallow()
 migrate = Migrate()
 jwt = JWTManager()
 
+
 def create_app(config_type='development'):
     app = Flask(__name__)
 
@@ -30,9 +31,11 @@ def create_app(config_type='development'):
     from api.recipes import recipes_bp
     from api.ingredients import ingredients_bp
     from api.auth import auth_bp
+    from api.users import users_bp
 
     app.register_blueprint(recipes_bp)
     app.register_blueprint(ingredients_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(users_bp)
 
     return app

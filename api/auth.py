@@ -13,13 +13,13 @@ auth_bp = Blueprint('authorization', __name__, url_prefix='/api/auth')
 
 @jwt.user_identity_loader
 def user_identity_lookup(user):
-    return user.id
+    return str(user.id)
 
 
 @jwt.user_lookup_loader
 def user_lookup_callback(_jwt_header, jwt_data):
     identity = jwt_data['sub']
-    return db.session.query(User).filter_by(id=identity).one_or_none()
+    return db.session.query(User).filter_by(id=int(identity)).one_or_none()
 
 
 @auth_bp.route('/register', methods=['POST'])
