@@ -5,9 +5,7 @@ from models import Recipe, UserRecipe
 from config import db, jwt
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from flask_jwt_extended import create_access_token, jwt_required
-from flask_jwt_extended import current_user
-from werkzeug.security import check_password_hash
+from flask_jwt_extended import jwt_required, current_user
 
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
@@ -50,3 +48,22 @@ def add_user_recipe():
                         "status": 500}), 500
 
 
+@users_bp.route('/recipes/<int:recipe_id>', methods=['GET'])
+@jwt_required()
+def get_user_recipe_by_id(recipe_id):
+    user_recipe = db.session.get(UserRecipe, (current_user.id, recipe_id))
+    if not user_recipe:
+        return jsonify({"error": f"Recipe id {recipe_id} not found for user",
+                        "status": 404}), 404
+    return jsonify(user_recipe_schema.dump(user_recipe)), 200
+
+
+@users_bp.route('/recipes/<int:recipe_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user_recipe(recipe_id):
+    user_recipe = db.session.get(UserRecipe, (current_user.id, recipe_id))
+    db.session.delete(user_recipe)
+    db.session.commit()
+    return jsonify({"message": f"Successfully deleted recipe id {recipe_id} "
+                    "from collection",
+                    "status": 200}), 200

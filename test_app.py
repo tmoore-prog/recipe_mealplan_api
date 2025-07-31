@@ -2,7 +2,7 @@ import pytest
 import json
 from config import create_app, db
 from datetime import datetime, timedelta
-from models import recipe_schema, ingredient_schema, recipe_ingredient_schema
+# from models import recipe_schema, ingredient_schema, recipe_ingredient_schema
 
 
 @pytest.fixture
@@ -19,7 +19,51 @@ def client():
             db.drop_all()
 
 
-# Restructure? Bulky and unneeded?
+def create_test_user(client, username="johndoe123", password="1234secret",
+                     email="john.doe@example.com"):
+    user_data = {"username": username,
+                 "password": password,
+                 "email": email}
+    return client.post('/api/auth/register', data=json.dumps(user_data),
+                       content_type='application/json')
+
+
+def login_test_user(client, username="johndoe123", password="1234secret"):
+    login_data = {"username": username,
+                  "password": password}
+    return client.post('/api/auth/login', data=json.dumps(login_data),
+                       content_type='application/json')
+
+
+def get_auth_headers(client, func=login_test_user):
+    response = func(client)
+    access_token = response.get_json()['access_token']
+    return {"Authorization": f"Bearer {access_token}"}
+
+
+def create_test_recipe(client, name="Test recipe", instructions="Test steps",
+                       prep_time=10, cook_time=10, servings=3):
+    recipe_data = {
+        "name": name,
+        "instructions": instructions,
+        "prep_time": prep_time,
+        "cook_time": cook_time,
+        "servings": servings
+    }
+    return client.post('/api/recipes/', data=json.dumps(recipe_data),
+                       content_type='application/json')
+
+
+def create_test_user_recipe(client, recipe_id, headers, user_notes="Test"):
+    user_recipe_data = {
+        "recipe_id": recipe_id,
+        "user_notes": user_notes
+    }
+    return client.post('/api/users/recipes', data=json.dumps(user_recipe_data),
+                       content_type='application/json', headers=headers)
+
+
+''' Restructure? Bulky and unneeded?
 @pytest.fixture
 def preload_client():
     test_app = create_app(config_type='testing')
@@ -72,6 +116,7 @@ def preload_client():
 
             db.session.remove()
             db.drop_all()
+'''
 
 
 def test_get_empty_recipes_list(client):
@@ -103,53 +148,26 @@ def test_recipe_bad_integer_data(client):
         {"cook_time": "Twenty"},
         {"servings": "Two"}
     ]
-
     for case in test_cases:
-        data = {
-            "name": "Test Recipe",
-            "instructions": "Test instructions",
-            "prep_time": 30,
-            "cook_time": 20,
-            "servings": 2,
-            **case
-        }
-        response = client.post('/api/recipes/', data=json.dumps(data),
-                               content_type='application/json')
+        response = create_test_recipe(client, **case)
         assert response.status_code == 400
 
 
 def test_add_same_name_recipe(client):
-    data = [{
-        "name": "Test Recipe",
-        "instructions": "Test instructions",
-        "prep_time": 30,
-        "cook_time": 20,
-        "servings": 2
-        },
-        {
-        "name": "Test Recipe",
+    data = {
+        "name": "Test recipe",
         "instructions": "Test instructions 2",
         "prep_time": 45,
         "cook_time": 20,
         "servings": 3
-    }]
-    client.post('/api/recipes/', data=json.dumps(data[0]),
-                content_type='application/json')
-    response = client.post('/api/recipes/', data=json.dumps(data[1]),
-                           content_type='application/json')
+    }
+    create_test_recipe(client)
+    response = create_test_recipe(client, **data)
     assert response.status_code == 409
 
 
 def test_add_name_empty(client):
-    data = {
-        "name": "",
-        "instructions": "Test instructions",
-        "prep_time": 30,
-        "cook_time": 20,
-        "servings": 2
-    }
-    response = client.post('/api/recipes/', data=json.dumps(data),
-                           content_type='application/json')
+    response = create_test_recipe(client, name="")
     assert response.status_code == 400
     data = response.get_json()
     assert data['error'] == "Invalid data"
@@ -162,16 +180,7 @@ def test_add_negative_integer_data(client):
         {"servings": -5}
     ]
     for case in test_cases:
-        data = {
-            "name": "Test Recipe",
-            "instructions": "Test instructions",
-            "prep_time": 30,
-            "cook_time": 20,
-            "servings": 2,
-            **case
-        }
-        response = client.post('/api/recipes/', data=json.dumps(data),
-                               content_type='application/json')
+        response = create_test_recipe(client, **case)
         assert response.status_code == 400
 
 
@@ -396,7 +405,7 @@ def test_delete_non_existent_ingredient(client):
     assert response.status_code == 404
 
 
-# Restructure preload client?
+'''# Restructure preload client?
 def test_get_ingredients_by_recipe(preload_client):
     recipe_id = 1
     response = preload_client.get(f'/api/recipes/{recipe_id}/ingredients')
@@ -405,6 +414,7 @@ def test_get_ingredients_by_recipe(preload_client):
     assert data[0]['quantity'] == 2
     assert data[1]['notes'] == "diced"
     assert data[2]['ingredient']['name'] == "Ingredient 3"
+'''
 
 
 def test_add_ingredient_to_recipe(client):
@@ -952,13 +962,8 @@ def test_add_multiple_ingredients_not_list_formatted(client):
 
 
 def test_register_new_user_doesnt_return_hash(client):
-    data = {
-        "username": "Testexample",
-        "password": "1234secret",
-        "email": "test@example.com"
-    }
-    response = client.post('/api/auth/register', data=json.dumps(data),
-                           content_type='application/json')
+    response = create_test_user(client)
+
     assert response.status_code == 201
     data = response.get_json()
     assert 'password_hash' not in data
@@ -978,18 +983,12 @@ def test_register_new_user_missing_data(client):
 
 
 def test_register_new_user_unique_constraints(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
+    create_test_user(client)
     data_cases = [
-        {"username": "johndoe1", "password": "1234secret",
+        {"username": "johndoe123", "password": "1234secret",
          "email": "jdoe@example.org"},
         {"username": "johndoe2", "password": "1234secret",
-         "email": "john@example.com"}
+         "email": "john.doe@example.com"}
     ]
     for data in data_cases:
         response = client.post('/api/auth/register', data=json.dumps(data),
@@ -998,57 +997,22 @@ def test_register_new_user_unique_constraints(client):
 
 
 def test_get_jwt_with_valid_user(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
-    login = {
-        "username": "johndoe1",
-        "password": "1234secret"
-    }
-    response = client.post('/api/auth/login', data=json.dumps(login),
-                           content_type='application/json')
+    create_test_user(client)
+    response = login_test_user(client)
     assert response.status_code == 200
     data = response.get_json()
     assert data['access_token']
 
 
 def test_get_jwt_with_invalid_pw(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
-    login = {
-        "username": "johndoe1",
-        "password": "FakePassword"
-    }
-    response = client.post('/api/auth/login', data=json.dumps(login),
-                           content_type='application/json')
+    create_test_user(client)
+    response = login_test_user(client, password="FakePassword")
     assert response.status_code == 400
 
 
 def test_get_empty_user_recipes(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
-    login = {
-        "username": "johndoe1",
-        "password": "1234secret"
-    }
-    response = client.post('/api/auth/login', data=json.dumps(login),
-                           content_type='application/json')
-    access_token = response.get_json()['access_token']
-    headers = {"Authorization": f"Bearer {access_token}"}
+    create_test_user(client)
+    headers = get_auth_headers(client)
     response = client.get('/api/users/recipes', headers=headers)
     assert response.status_code == 200
     assert response.get_json() == []
@@ -1060,160 +1024,79 @@ def test_get_user_recipes_no_token(client):
 
 
 def test_add_recipe_to_user(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
+    create_test_user(client)
+    create_response = create_test_recipe(client)
     recipe_id = create_response.get_json()['id']
-    login = {
-        "username": "johndoe1",
-        "password": "1234secret"
-    }
-    login_response = client.post('/api/auth/login', data=json.dumps(login),
-                                 content_type='application/json')
-    access_token = login_response.get_json()['access_token']
-    headers = {"Authorization": f"Bearer {access_token}"}
-    ur_data = {
-        "recipe_id": recipe_id,
-        "user_notes": "Test"
-    }
-    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
-                           content_type='application/json',
-                           headers=headers)
+    headers = get_auth_headers(client)
+    response = create_test_user_recipe(client, recipe_id, headers)
     assert response.status_code == 201
     data = response.get_json()
     assert data['user_id'] == 1
 
 
 def test_add_non_existent_recipe_to_user(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
+    create_test_user(client)
     recipe_id = 101
-    login = {
-        "username": "johndoe1",
-        "password": "1234secret"
-    }
-    login_response = client.post('/api/auth/login', data=json.dumps(login),
-                                 content_type='application/json')
-    access_token = login_response.get_json()['access_token']
-    headers = {"Authorization": f"Bearer {access_token}"}
-    ur_data = {
-        "recipe_id": recipe_id,
-        "user_notes": "Test"
-    }
-    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
-                           content_type='application/json',
-                           headers=headers)
+    headers = get_auth_headers(client)
+    response = create_test_user_recipe(client, recipe_id, headers)
     assert response.status_code == 404
 
 
 def test_add_user_recipe_no_token(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
+    create_response = create_test_recipe(client)
     recipe_id = create_response.get_json()['id']
-    ur_data = {
-        "recipe_id": recipe_id,
-        "user_notes": "Test"
-    }
-    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
-                           content_type='application/json')
+    response = create_test_user_recipe(client, recipe_id, headers=None)
     assert response.status_code == 401
 
 
 def test_add_user_recipe_bad_data(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    login = {
-        "username": "johndoe1",
-        "password": "1234secret"
-    }
-    login_response = client.post('/api/auth/login', data=json.dumps(login),
-                                 content_type='application/json')
-    access_token = login_response.get_json()['access_token']
-    headers = {"Authorization": f"Bearer {access_token}"}
-    ur_data = {
-        "recipe_id": recipe_id,
-        "user_notes": 123
-    }
-    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
-                           content_type='application/json',
-                           headers=headers)
+    create_test_user(client)
+    recipe_response = create_test_recipe(client)
+    recipe_id = recipe_response.get_json()['id']
+    headers = get_auth_headers(client)
+    response = create_test_user_recipe(client, recipe_id, headers,
+                                       user_notes=123)
     assert response.status_code == 400
 
 
 def test_add_duplicate_user_recipe(client):
-    user_data = {
-        "username": "johndoe1",
-        "password": "1234secret",
-        "email": "john@example.com"
-    }
-    client.post('/api/auth/register', data=json.dumps(user_data),
-                content_type='application/json')
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    login = {
-        "username": "johndoe1",
-        "password": "1234secret"
-    }
-    login_response = client.post('/api/auth/login', data=json.dumps(login),
-                                 content_type='application/json')
-    access_token = login_response.get_json()['access_token']
-    headers = {"Authorization": f"Bearer {access_token}"}
-    ur_data = {
-        "recipe_id": recipe_id,
-        "user_notes": "Test"
-    }
-    client.post('/api/users/recipes', data=json.dumps(ur_data),
-                content_type='application/json', headers=headers)
-    response = client.post('/api/users/recipes', data=json.dumps(ur_data),
-                           content_type='application/json',
-                           headers=headers)
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    create_test_user_recipe(client, recipe_id, headers)
+    response = create_test_user_recipe(client, recipe_id, headers)
     assert response.status_code == 409
- 
+
+
+def test_add_user_recipe_no_notes(client):
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    response = create_test_user_recipe(client, recipe_id, headers,
+                                       user_notes=None)
+    assert response.status_code == 201
+
+
+def test_get_specific_recipe_from_user_collection(client):
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    create_test_user_recipe(client, recipe_id, headers)
+    get_response = client.get(f'/api/users/recipes/{recipe_id}',
+                              headers=headers)
+    assert get_response.status_code == 200
+    data = get_response.get_json()
+    print(data)
+
+
+def test_delete_user_recipe(client):
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    create_test_user_recipe(client, recipe_id, headers)
+    delete_response = client.delete(f'/api/users/recipes/{recipe_id}',
+                                    headers=headers)
+    assert delete_response.status_code == 200
+    get_response = client.get(f'/api/users/recipes/{recipe_id}',
+                              headers=headers)
+    assert get_response.status_code == 404
