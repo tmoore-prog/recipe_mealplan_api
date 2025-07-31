@@ -54,6 +54,30 @@ def create_test_recipe(client, name="Test recipe", instructions="Test steps",
                        content_type='application/json')
 
 
+def create_test_ingredient(client, name="Test ingredient",
+                           category="Test cat"):
+    ingredient_data = {
+        "name": name,
+        "category": category
+    }
+    return client.post('/api/ingredients/', data=json.dumps(ingredient_data),
+                       content_type='application/json')
+
+
+def create_test_recipe_ingredient(client, recipe_id,
+                                  ingredient_id, quantity=2,
+                                  unit="cups", notes="diced"):
+    ri_data = {
+        "ingredient_id": ingredient_id,
+        "quantity": quantity,
+        "unit": unit,
+        "notes": notes
+    }
+    return client.post(f'/api/recipes/{recipe_id}/ingredients',
+                       data=json.dumps(ri_data),
+                       content_type='application/json')
+
+
 def create_test_user_recipe(client, recipe_id, headers, user_notes="Test"):
     user_recipe_data = {
         "recipe_id": recipe_id,
@@ -202,33 +226,15 @@ def test_user_cannot_override_created_at(client):
 
 
 def test_created_at_auto_populates(client):
-    data = {
-        "name": "Test Recipe",
-        "instructions": "Test instructions",
-        "prep_time": 30,
-        "cook_time": 20,
-        "servings": 2
-    }
-    response = client.post('/api/recipes/', data=json.dumps(data),
-                           content_type='application/json')
+    response = create_test_recipe(client)
     assert response.status_code == 201
-
     data = response.get_json()
     create_time = datetime.fromisoformat(data['created_at'])
-
     assert create_time
 
 
 def test_patch_recipe(client):
-    data = {
-        "name": "Test Recipe",
-        "instructions": "Test instructions",
-        "prep_time": 30,
-        "cook_time": 20,
-        "servings": 2
-    }
-    client.post('/api/recipes/', data=json.dumps(data),
-                content_type='application/json')
+    create_test_recipe(client)
     update = {"servings": 4}
     response = client.patch('/api/recipes/1', data=json.dumps(update),
                             content_type='application/json')
@@ -238,31 +244,13 @@ def test_patch_recipe(client):
 
 
 def test_get_recipe_by_id(client):
-    data = {
-        "name": "Test Recipe",
-        "instructions": "Test instructions",
-        "prep_time": 30,
-        "cook_time": 20,
-        "servings": 2
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
+    recipe_id = create_test_recipe(client).get_json()['id']
     response = client.get(f'/api/recipes/{recipe_id}')
     assert response.status_code == 200
 
 
 def test_delete_recipe_by_id(client):
-    data = {
-        "name": "Test Recipe",
-        "instructions": "Test instructions",
-        "prep_time": 30,
-        "cook_time": 20,
-        "servings": 2
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
+    recipe_id = create_test_recipe(client).get_json()['id']
     response = client.delete(f'/api/recipes/{recipe_id}')
     assert response.status_code == 200
     check = client.get(f'/api/recipes/{recipe_id}')
@@ -290,19 +278,12 @@ def test_get_ingredient_returns_created_ingredient(client):
 
 
 def test_get_multiple_ingredients(client):
-    data = [
-        {
-            "name": "Test ingredient 1",
-            "category": "Test"
-        },
-        {
-            "name": "Test ingredient 2",
-            "category": "Test"
-        }
+    ingredient_data = [
+        {"name": "Test ingredient 1", "category": "Test"},
+        {"name": "Test ingredient 2", "category": "Test"}
     ]
-    for datum in data:
-        client.post('/api/ingredients/', data=json.dumps(datum),
-                    content_type='application/json')
+    for data in ingredient_data:
+        create_test_ingredient(client, **data)
     response = client.get('/api/ingredients/')
     assert response.status_code == 200
     data = response.get_json()
@@ -310,33 +291,17 @@ def test_get_multiple_ingredients(client):
 
 
 def test_create_ingredient_empty_name(client):
-    data = {
-        "name": "",
-        "category": "Test cat."
-    }
-    create_response = client.post('/api/ingredients/', data=json.dumps(data),
-                                  content_type='application/json')
+    create_response = create_test_ingredient(client, name="")
     assert create_response.status_code == 400
 
 
 def test_create_ingredient_empty_category(client):
-    data = {
-        "name": "Test ingredient",
-        "category": ""
-    }
-    create_response = client.post('/api/ingredients/', data=json.dumps(data),
-                                  content_type='application/json')
+    create_response = create_test_ingredient(client, category="")
     assert create_response.status_code == 400
 
 
 def test_update_ingredient(client):
-    data = {
-        "name": "Test ingredient",
-        "category": "Test cat."
-    }
-    create_response = client.post('/api/ingredients/', data=json.dumps(data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     update = {"category": "food"}
     update_response = client.patch(f'/api/ingredients/{ingredient_id}',
                                    data=json.dumps(update),
@@ -352,29 +317,16 @@ def test_update_nonexistent_ingredient(client):
 
 
 def test_update_with_invalid_data(client):
-    data = {
-        "name": "Test ingredient",
-        "category": "Test cat."
-    }
-    create_response = client.post('/api/ingredients/', data=json.dumps(data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     update = {"category": ""}
-    update_response = client.patch(f'/api/ingredients/{ingredient_id}',
-                                   data=json.dumps(update),
-                                   content_type='application/json'
-                                   )
-    assert update_response.status_code == 400
+    response = client.patch(f'/api/ingredients/{ingredient_id}',
+                            data=json.dumps(update),
+                            content_type='application/json')
+    assert response.status_code == 400
 
 
 def test_get_ingredient_by_id(client):
-    data = {
-        "name": "Test ingredient",
-        "category": "Test cat."
-    }
-    create_response = client.post('/api/ingredients/', data=json.dumps(data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     get_response = client.get(f'/api/ingredients/{ingredient_id}')
     assert get_response.status_code == 200
 
@@ -387,13 +339,7 @@ def test_get_non_existent_ingredient(client):
 
 
 def test_delete_ingredient(client):
-    data = {
-        "name": "Test ingredient",
-        "category": "Test cat."
-    }
-    create_response = client.post('/api/ingredients/', data=json.dumps(data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     response = client.delete(f'/api/ingredients/{ingredient_id}')
     assert response.status_code == 200
     get_response = client.get(f'/api/ingredients/{ingredient_id}')
@@ -418,24 +364,8 @@ def test_get_ingredients_by_recipe(preload_client):
 
 
 def test_add_ingredient_to_recipe(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     ri_data = {
         "ingredient_id": ingredient_id,
         "quantity": 2,
@@ -450,14 +380,7 @@ def test_add_ingredient_to_recipe(client):
 
 def test_add_ingredient_to_non_existent_recipe(client):
     recipe_id = 35
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     ri_data = {
         "ingredient_id": ingredient_id,
         "quantity": 2,
@@ -471,129 +394,48 @@ def test_add_ingredient_to_non_existent_recipe(client):
 
 
 def test_add_non_existent_ingredient_to_recipe(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
+    recipe_id = create_test_recipe(client).get_json()['id']
     ingredient_id = 55
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    response = client.post(f'/api/recipes/{recipe_id}/ingredients',
-                           data=json.dumps(ri_data),
-                           content_type='application/json')
+    response = create_test_recipe_ingredient(client, recipe_id,
+                                             ingredient_id)
     assert response.status_code == 404
     data = response.get_json()
     assert data['error'] == "Ingredient id 55 not found"
 
 
-# ri stands for Recipe Ingredient
 def test_add_ingredient_to_recipe_invalid_ri_data(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
     ri_data_cases = [
-        {"ingredient_id": ingredient_id, "unit": "cups", "notes": "diced"},
-        {"ingredient_id": ingredient_id, "quantity": 2,
-         "unit": "this is well over limit",
+        {"quantity": "Two", "unit": "cups", "notes": "diced"},
+        {"quantity": 2, "unit": "this is well over limit",
          "notes": "diced"},
-        {"ingredient_id": ingredient_id, "quantity": 2, "unit": "cups",
+        {"quantity": 2, "unit": "cups",
          "notes": "this is over twenty characters"}
     ]
     for case in ri_data_cases:
-        response = client.post(f'/api/recipes/{recipe_id}/ingredients',
-                               data=json.dumps(case),
-                               content_type='application/json')
+        response = create_test_recipe_ingredient(client, recipe_id,
+                                                 ingredient_id,
+                                                 **case)
         assert response.status_code == 400
 
 
 def test_add_same_ingredient_to_recipe_twice(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    client.post(f'/api/recipes/{recipe_id}/ingredients',
-                data=json.dumps(ri_data),
-                content_type='application/json')
-    response = client.post(f'/api/recipes/{recipe_id}/ingredients',
-                           data=json.dumps(ri_data),
-                           content_type='application/json')
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
+    create_test_recipe_ingredient(client, recipe_id,
+                                  ingredient_id)
+    response = create_test_recipe_ingredient(client, recipe_id,
+                                             ingredient_id)
     assert response.status_code == 409
 
 
 def test_get_specific_recipe_ingredient(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    client.post(f'/api/recipes/{recipe_id}/ingredients',
-                data=json.dumps(ri_data),
-                content_type='application/json')
-    response = client.get(f'/api/recipes/{recipe_id}/ingredients/{ingredient_id}')
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
+    create_test_recipe_ingredient(client, recipe_id, ingredient_id)
+    response = client.get(f'/api/recipes/{recipe_id}/'
+                          f'ingredients/{ingredient_id}')
     assert response.status_code == 200
     data = response.get_json()
     assert data['ingredient']['name'] == "Test ingredient"
@@ -602,43 +444,17 @@ def test_get_specific_recipe_ingredient(client):
 def test_get_non_existent_recipe_ingredient(client):
     recipe_id = 38
     ingredient_id = 31
-    response = client.get(f'/api/recipes/{recipe_id}/ingredients/{ingredient_id}')
+    response = client.get(f'/api/recipes/{recipe_id}/'
+                          f'ingredients/{ingredient_id}')
     assert response.status_code == 404
     data = response.get_json()
     assert data['error'] == "Ingredient id 31 not found for recipe id 38"
 
 
 def test_remove_ingredient_from_recipe(client):
-    # Set up test data
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    client.post(f'/api/recipes/{recipe_id}/ingredients',
-                data=json.dumps(ri_data),
-                content_type='application/json')
-
-    # Delete test recipe ingredient
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
+    create_test_recipe_ingredient(client, recipe_id, ingredient_id)
     delete_response = client.delete(f'/api/recipes/{recipe_id}/ingredients'
                                     f'/{ingredient_id}')
     assert delete_response.status_code == 200
@@ -656,33 +472,9 @@ def test_remove_non_existent_recipe_ingredient(client):
 
 
 def test_update_recipe_ingredient(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    client.post(f'/api/recipes/{recipe_id}/ingredients',
-                data=json.dumps(ri_data),
-                content_type='application/json')
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
+    create_test_recipe_ingredient(client, recipe_id, ingredient_id)
     update_data_cases = [
         {"quantity": 4},
         {"unit": "tbsp"},
@@ -696,33 +488,9 @@ def test_update_recipe_ingredient(client):
 
 
 def test_update_ri_blocks_updating_ids(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    client.post(f'/api/recipes/{recipe_id}/ingredients',
-                data=json.dumps(ri_data),
-                content_type='application/json')
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
+    create_test_recipe_ingredient(client, recipe_id, ingredient_id)
     update_data_cases = [
         {"recipe_id": 4, "unit": "grams"},
         {"ingredient_id": 5, "unit": "grams"}
@@ -748,34 +516,9 @@ def test_update_non_existent_recipe_ingredient(client):
 
 
 def test_update_ri_with_bad_data(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = {
-        "name": "Test ingredient",
-        "category": "Test cat"
-    }
-    create_response = client.post('/api/ingredients/',
-                                  data=json.dumps(ingredient_data),
-                                  content_type='application/json')
-    ingredient_id = create_response.get_json()['id']
-    ri_data = {
-        "ingredient_id": ingredient_id,
-        "quantity": 2,
-        "unit": "cups",
-        "notes": "diced"
-    }
-    client.post(f'/api/recipes/{recipe_id}/ingredients',
-                data=json.dumps(ri_data),
-                content_type='application/json')
-
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_id = create_test_ingredient(client).get_json()['id']
+    create_test_recipe_ingredient(client, recipe_id, ingredient_id)
     data_cases = [
         {"quantity": "Three"},
         {"unit": 2},
@@ -789,31 +532,9 @@ def test_update_ri_with_bad_data(client):
 
 
 def test_add_multiple_ingredients_to_recipe(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = [
-        {"name": "Test ingredient",
-         "category": "Test cat"},
-        {"name": "Test ingredient 2",
-         "category": "Test cat"},
-        {"name": "Test ingredient 3",
-         "category": "Test cat"}
-    ]
-    ingredient_ids = []
-    for ingredient in ingredient_data:
-        create_response = client.post('/api/ingredients/',
-                                      data=json.dumps(ingredient),
-                                      content_type='application/json')
-        ingredient_id = create_response.get_json()['id']
-        ingredient_ids.append(ingredient_id)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_ids = [create_test_ingredient(client,
+                      name=f"Test{i}").get_json()['id'] for i in range(3)]
     ri_data = []
     for ingredient_id in ingredient_ids:
         ri_dict = {"ingredient_id": ingredient_id,
@@ -830,21 +551,8 @@ def test_add_multiple_ingredients_to_recipe(client):
 
 
 def test_add_multiple_ingredients_to_nonexistent_recipe(client):
-    ingredient_data = [
-        {"name": "Test ingredient",
-         "category": "Test cat"},
-        {"name": "Test ingredient 2",
-         "category": "Test cat"},
-        {"name": "Test ingredient 3",
-         "category": "Test cat"}
-    ]
-    ingredient_ids = []
-    for ingredient in ingredient_data:
-        create_response = client.post('/api/ingredients/',
-                                      data=json.dumps(ingredient),
-                                      content_type='application/json')
-        ingredient_id = create_response.get_json()['id']
-        ingredient_ids.append(ingredient_id)
+    ingredient_ids = [create_test_ingredient(client,
+                      name=f"Test{i}").get_json()['id'] for i in range(3)]
     ri_data = []
     for ingredient_id in ingredient_ids:
         ri_dict = {"ingredient_id": ingredient_id,
@@ -859,16 +567,7 @@ def test_add_multiple_ingredients_to_nonexistent_recipe(client):
 
 
 def test_add_multiple_non_existent_ingredients_to_recipe(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
+    recipe_id = create_test_recipe(client).get_json()['id']
     ingredient_ids = [1, 2, 3]
     ri_data = []
     for ingredient_id in ingredient_ids:
@@ -884,31 +583,9 @@ def test_add_multiple_non_existent_ingredients_to_recipe(client):
 
 
 def test_add_multiple_bad_formatted_ingredients_to_recipe(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = [
-        {"name": "Test ingredient",
-         "category": "Test cat"},
-        {"name": "Test ingredient 2",
-         "category": "Test cat"},
-        {"name": "Test ingredient 3",
-         "category": "Test cat"}
-    ]
-    ingredient_ids = []
-    for ingredient in ingredient_data:
-        create_response = client.post('/api/ingredients/',
-                                      data=json.dumps(ingredient),
-                                      content_type='application/json')
-        ingredient_id = create_response.get_json()['id']
-        ingredient_ids.append(ingredient_id)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_ids = [create_test_ingredient(client,
+                      name=f"Test{i}").get_json()['id'] for i in range(3)]
     ri_data = []
     for ingredient_id in ingredient_ids:
         ri_dict = {"ingredient_id": ingredient_id,
@@ -923,31 +600,9 @@ def test_add_multiple_bad_formatted_ingredients_to_recipe(client):
 
 
 def test_add_multiple_ingredients_not_list_formatted(client):
-    recipe_data = {
-        "name": "Test recipe",
-        "instructions": "Test steps",
-        "prep_time": 10,
-        "cook_time": 10,
-        "servings": 3
-    }
-    create_response = client.post('/api/recipes/', data=json.dumps(recipe_data),
-                                  content_type='application/json')
-    recipe_id = create_response.get_json()['id']
-    ingredient_data = [
-        {"name": "Test ingredient",
-         "category": "Test cat"},
-        {"name": "Test ingredient 2",
-         "category": "Test cat"},
-        {"name": "Test ingredient 3",
-         "category": "Test cat"}
-    ]
-    ingredient_ids = []
-    for ingredient in ingredient_data:
-        create_response = client.post('/api/ingredients/',
-                                      data=json.dumps(ingredient),
-                                      content_type='application/json')
-        ingredient_id = create_response.get_json()['id']
-        ingredient_ids.append(ingredient_id)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    ingredient_ids = [create_test_ingredient(client,
+                      name=f"Test{i}").get_json()['id'] for i in range(3)]
     ri_data = {}
     for ingredient_id in ingredient_ids:
         ri_dict = {"ingredient_id": ingredient_id,
@@ -962,7 +617,11 @@ def test_add_multiple_ingredients_not_list_formatted(client):
 
 
 def test_register_new_user_doesnt_return_hash(client):
-    response = create_test_user(client)
+    user_data = {"username": "johndoe123",
+                 "password": "1234secret",
+                 "email": "john.doe@example.com"}
+    response = client.post('/api/auth/register', data=json.dumps(user_data),
+                           content_type='application/json')
 
     assert response.status_code == 201
     data = response.get_json()
@@ -991,8 +650,7 @@ def test_register_new_user_unique_constraints(client):
          "email": "john.doe@example.com"}
     ]
     for data in data_cases:
-        response = client.post('/api/auth/register', data=json.dumps(data),
-                               content_type='application/json')
+        response = create_test_user(client, **data)
         assert response.status_code == 409
 
 
