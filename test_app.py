@@ -87,65 +87,10 @@ def create_test_user_recipe(client, recipe_id, headers, user_notes="Test"):
                        content_type='application/json', headers=headers)
 
 
-''' Restructure? Bulky and unneeded?
-@pytest.fixture
-def preload_client():
-    test_app = create_app(config_type='testing')
-
-    with test_app.test_client() as client:
-        with test_app.app_context():
-            db.create_all()
-
-            recipes = [
-                {"name": "Test 1", "instructions": "Test, test, test",
-                 "prep_time": 20, "cook_time": 20, "servings": 2},
-                {"name": "Test 2", "instructions": "Test, test, test",
-                 "prep_time": 20, "cook_time": 20, "servings": 2},
-                {"name": "Test 3", "instructions": "Test, test, test",
-                 "prep_time": 20, "cook_time": 20, "servings": 2}
-            ]
-            for recipe in recipes:
-                data = recipe_schema.load(recipe)
-                db.session.add(data)
-                db.session.commit()
-            ingredients = [
-                {"name": "Ingredient 1", "category": "food"},
-                {"name": "Ingredient 2", "category": "food"},
-                {"name": "Ingredient 3", "category": "food"},
-                {"name": "Ingredient 4", "category": "food"},
-                {"name": "Ingredient 5", "category": "food"}
-            ]
-            for ingredient in ingredients:
-                data = ingredient_schema.load(ingredient)
-                db.session.add(data)
-                db.session.commit()
-            recipe_ingredients = [
-                {"recipe_id": 1, "ingredient_id": 1, "quantity": 2,
-                 "unit": "cups", "notes": "level cups"},
-                {"recipe_id": 1, "ingredient_id": 2, "quantity": 3,
-                 "unit": "tbsps", "notes": "diced"},
-                {"recipe_id": 1, "ingredient_id": 3, "quantity": 1,
-                 "unit": "Each", "notes": "peeled"},
-                {"recipe_id": 2, "ingredient_id": 4, "quantity": 2,
-                 "unit": "tsps", "notes": None},
-                {"recipe_id": 3, "ingredient_id": 5, "quantity": 1,
-                 "unit": "each", "notes": "whole"}
-            ]
-            for recipeingred in recipe_ingredients:
-                data = recipe_ingredient_schema.load(recipeingred)
-                db.session.add(data)
-                db.session.commit()
-
-            yield client
-
-            db.session.remove()
-            db.drop_all()
-'''
-
-
 def test_get_empty_recipes_list(client):
     response = client.get('/api/recipes/')
     assert response.status_code == 200
+
     assert response.get_json() == []
 
 
@@ -351,16 +296,22 @@ def test_delete_non_existent_ingredient(client):
     assert response.status_code == 404
 
 
-'''# Restructure preload client?
-def test_get_ingredients_by_recipe(preload_client):
+def test_get_ingredients_by_recipe(client):
+    for i in range(3):
+        create_test_recipe(client, name=f"Test recipe{i}")
+    for i in range(3):
+        create_test_ingredient(client, name=f"Test ingredient{i}")
+    for i in range(1, 4):
+        recipe_id = i
+        ingredient_id = i
+        create_test_recipe_ingredient(client, recipe_id, ingredient_id)
     recipe_id = 1
-    response = preload_client.get(f'/api/recipes/{recipe_id}/ingredients')
+    response = client.get(f'/api/recipes/{recipe_id}/ingredients')
     assert response.status_code == 200
     data = response.get_json()
     assert data[0]['quantity'] == 2
-    assert data[1]['notes'] == "diced"
-    assert data[2]['ingredient']['name'] == "Ingredient 3"
-'''
+    assert data[0]['notes'] == "diced"
+    assert data[0]['ingredient']['name'] == "Test ingredient0"
 
 
 def test_add_ingredient_to_recipe(client):
@@ -747,6 +698,14 @@ def test_get_specific_recipe_from_user_collection(client):
     print(data)
 
 
+def test_get_non_existent_recipe_from_user_collection(client):
+    create_test_user(client)
+    headers = get_auth_headers(client)
+    get_response = client.get('/api/users/recipes/1',
+                              headers=headers)
+    assert get_response.status_code == 404
+
+
 def test_delete_user_recipe(client):
     create_test_user(client)
     recipe_id = create_test_recipe(client).get_json()['id']
@@ -758,3 +717,69 @@ def test_delete_user_recipe(client):
     get_response = client.get(f'/api/users/recipes/{recipe_id}',
                               headers=headers)
     assert get_response.status_code == 404
+
+
+def test_delete_non_existent_user_recipe(client):
+    create_test_user(client)
+    headers = get_auth_headers(client)
+    delete_response = client.delete('/api/users/recipes/1',
+                                    headers=headers)
+    assert delete_response.status_code == 404
+
+
+def test_update_user_notes_on_recipe(client):
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    create_test_user_recipe(client, recipe_id, headers)
+    update_data = {"user_notes": "More salt"}
+    response = client.patch(f'/api/users/recipes/{recipe_id}',
+                            data=json.dumps(update_data),
+                            content_type='application/json',
+                            headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['user_notes'] == 'More salt'
+
+
+def test_update_non_existent_user_recipe(client):
+    create_test_user(client)
+    headers = get_auth_headers(client)
+    update_data = {"user_notes": "More salt"}
+    response = client.patch('/api/users/recipes/123',
+                            data=json.dumps(update_data),
+                            content_type='application/json',
+                            headers=headers)
+    assert response.status_code == 404
+
+
+def test_update_user_recipe_invalid_data(client):
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    create_test_user_recipe(client, recipe_id, headers)
+    update_data = {"user_notes": 200}
+    response = client.patch(f'/api/users/recipes/{recipe_id}',
+                            data=json.dumps(update_data),
+                            content_type='application/json',
+                            headers=headers)
+    assert response.status_code == 400
+
+
+def test_update_user_recipe_allowed_fields(client):
+    create_test_user(client)
+    recipe_id = create_test_recipe(client).get_json()['id']
+    headers = get_auth_headers(client)
+    create_test_user_recipe(client, recipe_id, headers)
+    update_data = [
+        {"recipe_id": 100},
+        {"user_id": 20}
+    ]
+    for data in update_data:
+        response = client.patch(f'/api/users/recipes/{recipe_id}',
+                                data=json.dumps(data),
+                                content_type='application/json',
+                                headers=headers)
+        data = response.get_json()
+        assert data['recipe_id'] == 1
+        assert data['user_id'] == 1
